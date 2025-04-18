@@ -1,0 +1,1679 @@
+<p>© 2025 Suivi d'Hydratation Quotidienne</p>
+        <p>Buvez régulièrement. Votre corps vous remerciera!</p>
+    </footer>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Vérifier que Chart.js est chargé correctement
+            let chartJsLoaded = typeof Chart !== 'undefined';
+            
+            if (!chartJsLoaded) {
+                console.warn("Chart.js n'a pas été chargé correctement. Tentative de chargement...");
+                // Tenter de charger Chart.js si non disponible
+                loadChartJsScript();
+            }
+            
+            // DOM Elements
+            const waterContainers = document.getElementById('waterContainers');
+            const waterLog = document.getElementById('waterLog');
+            const totalAmountDisplay = document.getElementById('totalAmount');
+            const goalAmountDisplay = document.getElementById('goalAmount');
+            const progressFill = document.getElementById('progressFill');
+            const waterPercentage = document.getElementById('waterPercentage');
+            const themeToggle = document.getElementById('themeToggle');
+            const mantraText = document.getElementById('mantraText');
+            const statsView = document.getElementById('statsView');
+            const settingsView = document.getElementById('settingsView');
+            const viewStatsButton = document.getElementById('viewStatsButton');
+            const viewSettingsButton = document.getElementById('viewSettingsButton');
+            const backToMainButton = document.getElementById('backToMainButton');
+            const backFromSettingsButton = document.getElementById('backFromSettingsButton');
+            const addCustomContainer = document.getElementById('addCustomContainer');
+            const customContainerForm = document.getElementById('customContainerForm');
+            const saveContainer = document.getElementById('saveContainer');
+            const saveSettings = document.getElementById('saveSettings');
+            const dailyGoal = document.getElementById('dailyGoal');
+            const reminderInterval = document.getElementById('reminderInterval');
+            const reminderStart = document.getElementById('reminderStart');
+            const reminderEnd = document.getElementById('reminderEnd');
+            const averageDaily = document.getElementById('averageDaily');
+            const bestDay = document.getElementById('bestDay');
+            const weeklyTotal = document.getElementById('weeklyTotal');
+            const statsTabs = document.querySelectorAll('.stats-tab');
+            
+            // App State
+            let totalAmount = 0;
+            let goal = 2000;
+            let waterEntries = [];
+            let customContainers = [];
+            let currentStatsPeriod = 'week';
+            let reminders = {
+                interval: 60,
+                start: '08:00',
+                end: '20:00',
+                active: false
+            };
+            
+            // Mantras for blessing water
+            const mantras = [
+                "Je bénis cette eau qui nourrit chaque cellule de mon corps, me purifie et me donne énergie et vitalité.",
+                "Cette eau est pure, dynamisée et remplie d'énergie positive. Elle nettoie et revitalise tout mon être.",
+                "Que cette eau apporte santé, clarté et harmonie à mon corps, mon esprit et mon âme.",
+                "En buvant cette eau, je m'aligne avec la pureté et la fluidité de la vie elle-même.",
+                "Je remercie cette eau sacrée qui apporte équilibre et guérison à chaque partie de mon être.",
+                "Cette eau est chargée d'amour et de gratitude. En la buvant, je me connecte à la source de toute vie.",
+                "Je charge cette eau d'intentions positives pour qu'elle nourrisse parfaitement mon corps et mon esprit."
+            ];
+            
+            // Load data from localStorage
+            function loadData() {
+                try {
+                    const savedAmount = localStorage.getItem('totalAmount');
+                    if (savedAmount) {
+                        totalAmount = parseInt(savedAmount);
+                    }
+                    
+                    const savedGoal = localStorage.getItem('goal');
+                    if (savedGoal) {
+                        goal = parseInt(savedGoal);
+                        if (dailyGoal) dailyGoal.value = goal;
+                        if (goalAmountDisplay) goalAmountDisplay.textContent = goal + ' ml';
+                    }
+                    
+                    const savedEntries = localStorage.getItem('waterEntries');
+                    if (savedEntries) {
+                        const allEntries = JSON.parse(savedEntries);
+                        // Filter to only show today's entries
+                        const today = new Date().toLocaleDateString();
+                        waterEntries = allEntries.filter(entry => new Date(entry.timestamp).toLocaleDateString() === today);
+                        
+                        // Calculate today's total
+                        totalAmount = waterEntries.reduce((sum, entry) => sum + entry.amount, 0);
+                    }
+                    
+                    const savedContainers = localStorage.getItem('customContainers');
+                    if (savedContainers) {
+                        customContainers = JSON.parse(savedContainers);
+                    }
+                    
+                    const savedReminders = localStorage.getItem('reminders');
+                    if (savedReminders) {
+                        reminders = JSON.parse(savedReminders);
+                        if (reminderInterval) reminderInterval.value = reminders.interval;
+                        if (reminderStart) reminderStart.value = reminders.start;
+                        if (reminderEnd) reminderEnd.value = reminders.end;
+                    }
+                    
+                    const savedTheme = localStorage.getItem('theme');
+                    if (savedTheme === 'dark') {
+                        document.body.classList.add('dark-theme');
+                        if (themeToggle) themeToggle.textContent = '☀️';
+                    }
+                } catch (error) {
+                    console.error('Erreur lors du chargement des données:', error);
+                    // Afficher une erreur à l'utilisateur
+                    showError('Une erreur est survenue lors du chargement de vos données. Vos données ont été réinitialisées.');
+                    // Réinitialiser les données
+                    resetData();
+                }
+            }
+            
+            // Réinitialiser les données en cas d'erreur
+            function resetData() {
+                totalAmount = 0;
+                goal = 2000;
+                waterEntries = [];
+                customContainers = [];
+                reminders = {
+                    interval: 60,
+                    start: '08:00',
+                    end: '20:00',
+                    active: false
+                };
+                
+                saveData();
+            }
+            
+            // Afficher un message d'erreur
+            function showError(message) {
+                // Vérifier si un message d'erreur existe déjà
+                const existingError = document.querySelector('.error-message');
+                if (existingError) {
+                    existingError.textContent = message;
+                    return;
+                }
+                
+                // Créer un nouvel élément d'erreur
+                const errorElement = document.createElement('div');
+                errorElement.className = 'error-message';
+                errorElement.textContent = message;
+                
+                // Ajouter à la page
+                const container = document.querySelector('.container');
+                if (container) {
+                    container.insertBefore(errorElement, container.firstChild);
+                    
+                    // Faire disparaître après 5 secondes
+                    setTimeout(() => {
+                        errorElement.style.opacity = '0';
+                        errorElement.style.transition = 'opacity 1s';
+                        setTimeout(() => {
+                            errorElement.remove();
+                        }, 1000);
+                    }, 5000);
+                }
+            }
+            
+            // Save data to localStorage
+            function saveData() {
+                try {
+                    localStorage.setItem('totalAmount', totalAmount);
+                    localStorage.setItem('goal', goal);
+                    localStorage.setItem('waterEntries', JSON.stringify(waterEntries));
+                    localStorage.setItem('customContainers', JSON.stringify(customContainers));
+                    localStorage.setItem('reminders', JSON.stringify(reminders));
+                } catch (error) {
+                    console.error('Erreur lors de la sauvegarde des données:', error);
+                    showError('Impossible de sauvegarder vos données. Votre navigateur pourrait ne pas supporter le stockage local.');
+                }
+            }
+            
+            // Update the UI
+            function updateUI() {
+                try {
+                    if (totalAmountDisplay) totalAmountDisplay.textContent = totalAmount + ' ml';
+                    
+                    // Update progress
+                    const progress = Math.min((totalAmount / goal) * 100, 100);
+                    if (progressFill) progressFill.style.width = progress + '%';
+                    if (waterPercentage) waterPercentage.textContent = Math.round(progress) + '%';
+                    
+                    // Wave animation height
+                    const waveElement = document.querySelector('.water-wave');
+                    if (waveElement) {
+                        const waveHeight = Math.min(100 - progress, 100);
+                        waveElement.style.bottom = waveHeight + '%';
+                    }
+                    
+                    // Update log
+                    renderWaterLog();
+                    
+                    // Update stats
+                    updateStats();
+                    
+                    // Save data
+                    saveData();
+                } catch (error) {
+                    console.error('Erreur lors de la mise à jour de l\'interface:', error);
+                    showError('Une erreur est survenue lors de la mise à jour de l\'interface.');
+                }
+            }
+            
+            // Render water log entries
+            function renderWaterLog() {
+                if (!waterLog) return;
+                
+                waterLog.innerHTML = '';
+                
+                if (waterEntries.length === 0) {
+                    waterLog.innerHTML = '<p style="text-align: center; padding: 1rem;">Aucune entrée aujourd\'hui. Commencez à boire!</p>';
+                    return;
+                }
+                
+                try {
+                    // Sort by timestamp, most recent first
+                    waterEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    
+                    waterEntries.forEach((entry, index) => {
+                        const logEntry = document.createElement('div');
+                        logEntry.className = 'log-entry';
+                        
+                        const time = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        
+                        logEntry.innerHTML = `
+                            <div class="log-time">${time}</div>
+                            <div class="log-container">${entry.container} ${entry.icon}</div>
+                            <div class="log-amount">${entry.amount} ml</div>
+                            <div class="log-delete" data-index="${index}">❌</div>
+                        `;
+                        
+                        waterLog.appendChild(logEntry);
+                        
+                        // Add delete event listener
+                        const deleteBtn = logEntry.querySelector('.log-delete');
+                        if (deleteBtn) {
+                            deleteBtn.addEventListener('click', function() {
+                                const entryIndex = parseInt(this.getAttribute('data-index'));
+                                deleteEntry(entryIndex);
+                            });
+                        }
+                    });
+                } catch (error) {
+                    console.error('Erreur lors du rendu du journal d\'hydratation:', error);
+                    waterLog.innerHTML = '<p style="text-align: center; color: red; padding: 1rem;">Erreur lors du chargement du journal. Veuillez rafraîchir la page.</p>';
+                }
+            }
+            
+            // Add water entry
+            function addWaterEntry(amount, container, icon) {
+                try {
+                    const entry = {
+                        amount: amount,
+                        container: container,
+                        icon: icon,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    waterEntries.push(entry);
+                    totalAmount += amount;
+                    
+                    // Show mantra
+                    showRandomMantra();
+                    
+                    updateUI();
+                } catch (error) {
+                    console.error('Erreur lors de l\'ajout d\'une entrée d\'eau:', error);
+                    showError('Impossible d\'ajouter cette consommation d\'eau.');
+                }
+            }
+            
+            // Delete water entry
+            function deleteEntry(index) {
+                try {
+                    if (index >= 0 && index < waterEntries.length) {
+                        totalAmount -= waterEntries[index].amount;
+                        if (totalAmount < 0) totalAmount = 0;
+                        
+                        waterEntries.splice(index, 1);
+                        updateUI();
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de la suppression d\'une entrée d\'eau:', error);
+                    showError('Impossible de supprimer cette entrée.');
+                }
+            }
+            
+            // Show random mantra
+            function showRandomMantra() {
+                try {
+                    if (!mantraText) return;
+                    
+                    const randomIndex = Math.floor(Math.random() * mantras.length);
+                    mantraText.textContent = mantras[randomIndex];
+                    
+                    // Add animation
+                    mantraText.style.animation = 'none';
+                    setTimeout(() => {
+                        mantraText.style.animation = 'fadeIn 1s ease';
+                    }, 10);
+                } catch (error) {
+                    console.error('Erreur lors de l\'affichage du mantra:', error);
+                }
+            }
+            
+            // Render custom containers
+            function renderCustomContainers() {
+                if (!waterContainers) return;
+                
+                try {
+                    // Remove previous custom containers
+                    const existingCustoms = waterContainers.querySelectorAll('.custom-container');
+                    existingCustoms.forEach(element => element.remove());
+                    
+                    // Add custom containers
+                    customContainers.forEach(container => {
+                        const containerElement = document.createElement('div');
+                        containerElement.className = 'container-item custom-container';
+                        containerElement.setAttribute('data-ml', container.ml);
+                        
+                        containerElement.innerHTML = `
+                            <div class="container-icon">${container.icon}</div>
+                            <div class="container-name">${container.name}</div>
+                            <div class="container-ml">${container.ml} ml</div>
+                        `;
+                        
+                        waterContainers.appendChild(containerElement);
+                        
+                        // Add click event
+                        containerElement.addEventListener('click', function() {
+                            const amount = parseInt(this.getAttribute('data-ml'));
+                            const containerName = this.querySelector('.container-name').textContent;
+                            const icon = this.querySelector('.container-icon').textContent;
+                            
+                            addWaterEntry(amount, containerName, icon);
+                            
+                            // Flash animation
+                            this.classList.add('active');
+                            setTimeout(() => {
+                                this.classList.remove('active');
+                            }, 300);
+                        });
+                    });
+                } catch (error) {
+                    console.error('Erreur lors du rendu des contenants personnalisés:', error);
+                    showError('Impossible d\'afficher les contenants personnalisés.');
+                }
+            }
+            
+            // Update statistics
+            function updateStats() {
+                try {
+                    // Get all entries for statistics (not just today)
+                    const allEntriesStr = localStorage.getItem('waterEntries');
+                    if (!allEntriesStr) return;
+                    
+                    const allEntries = JSON.parse(allEntriesStr);
+                    
+                    if (allEntries.length === 0) {
+                        if (averageDaily) averageDaily.textContent = '0 ml';
+                        if (bestDay) bestDay.textContent = '0 ml';
+                        if (weeklyTotal) weeklyTotal.textContent = '0 ml';
+                        return;
+                    }
+                    
+                    // Group by date
+                    const entriesByDate = {};
+                    allEntries.forEach(entry => {
+                        const date = new Date(entry.timestamp).toLocaleDateString();
+                        if (!entriesByDate[date]) {
+                            entriesByDate[date] = [];
+                        }
+                        entriesByDate[date].push(entry);
+                    });
+                    
+                    // Calculate totals by date
+                    const totalsByDate = {};
+                    Object.keys(entriesByDate).forEach(date => {
+                        totalsByDate[date] = entriesByDate[date].reduce((sum, entry) => sum + entry.amount, 0);
+                    });
+                    
+                    // Calculate stats
+                    const daily = Object.values(totalsByDate);
+                    const average = daily.length > 0 ? Math.round(daily.reduce((sum, val) => sum + val, 0) / daily.length) : 0;
+                    if (averageDaily) averageDaily.textContent = average + ' ml';
+                    
+                    const max = daily.length > 0 ? Math.max(...daily) : 0;
+                    if (bestDay) bestDay.textContent = max + ' ml';
+                    
+                    // Get dates for the last week
+                    const today = new Date();
+                    const lastWeek = new Date(today);
+                    lastWeek.setDate(lastWeek.getDate() - 6);
+                    
+                    let weekTotal = 0;
+                    for (let i = 0; i < 7; i++) {
+                        const date = new Date(lastWeek);
+                        date.setDate(date.getDate() + i);
+                        const dateString = date.toLocaleDateString();
+                        if (totalsByDate[dateString]) {
+                            weekTotal += totalsByDate[dateString];
+                        }
+                    }
+                    
+                    if (weeklyTotal) weeklyTotal.textContent = weekTotal + ' ml';
+                    
+                    // Render chart if stats view is active and Chart.js is loaded
+                    if (statsView && statsView.style.display === 'block' && typeof Chart !== 'undefined') {
+                        renderChart(totalsByDate);
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de la mise à jour des statistiques:', error);
+                    // Ne pas afficher d'erreur à l'utilisateur car c'est moins critique
+                }
+            }
+            
+            // Render hydration chart
+            function renderChart(totalsByDate) {
+                // Vérifier que Chart.js est disponible
+                if (typeof Chart === 'undefined') {
+                    console.warn("Chart.js n'est pas disponible. Impossible de rendre le graphique.");
+                    
+                    // Afficher un message à la place du graphique
+                    const chartContainer = document.getElementById('statsChart');
+                    if (chartContainer) {
+                        chartContainer.innerHTML = `
+                            <div style="text-align: center; padding: 2rem;">
+                                <p>Impossible de charger le graphique.</p>
+                                <p>Veuillez rafraîchir la page ou réessayer plus tard.</p>
+                            </div>
+                        `;
+                    }
+                    return;
+                }
+                
+                try {
+                    const canvas = document.getElementById('hydrationChart');
+                    if (!canvas) {
+                        console.warn("Canvas 'hydrationChart' non trouvé.");
+                        return;
+                    }
+                    
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        console.warn("Impossible d'obtenir le contexte 2D du canvas.");
+                        return;
+                    }
+                    
+                    // Clear previous chart
+                    if (window.hydrationChart) {
+                        window.hydrationChart.destroy();
+                    }
+                    
+                    // Get dates for the period
+                    const today = new Date();
+                    let startDate, numDays, dateFormat;
+                    
+                    if (currentStatsPeriod === 'week') {
+                        startDate = new Date(today);
+                        startDate.setDate(startDate.getDate() - 6);
+                        numDays = 7;
+                        dateFormat = { weekday: 'short' };
+                    } else { // month
+                        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                        const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+                        numDays = lastDayOfMonth;
+                        dateFormat = { day: 'numeric' };
+                    }
+                    
+                    // Prepare data
+                    const labels = [];
+                    const data = [];
+                    
+                    for (let i = 0; i < numDays; i++) {
+                        const date = new Date(startDate);
+                        date.setDate(date.getDate() + i);
+                        
+                        const dateString = date.toLocaleDateString();
+                        const formattedDate = date.toLocaleDateString(undefined, dateFormat);
+                        
+                        labels.push(formattedDate);
+                        data.push(totalsByDate[dateString] || 0);
+                    }
+                    
+                    // Create chart
+                    window.hydrationChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Hydratation (ml)',
+                                data: data,
+                                backgroundColor: 'rgba(33, 150, 243, 0.5)',
+                                borderColor: 'rgba(33, 150, 243, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    grid: {
+                                        color: 'rgba(0, 0, 0, 0.1)'
+                                    }
+                                },
+                                x: {
+                                    grid: {
+                                        display: false
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error('Erreur lors du rendu du graphique:', error);
+                    
+                    // Afficher un message d'erreur à la place du graphique
+                    const chartContainer = document.getElementById('statsChart');
+                    if (chartContainer) {
+                        chartContainer.innerHTML = `
+                            <div style="text-align: center; padding: 2rem;">
+                                <p>Une erreur est survenue lors du chargement du graphique.</p>
+                                <p>Veuillez rafraîchir la page ou réessayer plus tard.</p>
+                            </div>
+                        `;
+                    }
+                }
+            }
+            
+            // Setup event listeners
+            function setupEventListeners() {
+                try {
+                    // Container clicks
+                    const containerItems = waterContainers ? waterContainers.querySelectorAll('.container-item') : [];
+                    containerItems.forEach(container => {
+                        container.addEventListener('click', function() {
+                            const amount = parseInt(this.getAttribute('data-ml'));
+                            const containerName = this.querySelector('.container-name').textContent;
+                            const icon = this.querySelector('.container-icon').textContent;
+                            
+                            addWaterEntry(amount, containerName, icon);
+                            
+                            // Flash animation
+                            this.classList.add('active');
+                            setTimeout(() => {
+                                this.classList.remove('active');
+                            }, 300);
+                        });
+                    });
+                    
+                    // Theme toggle
+                    if (themeToggle) {
+                        themeToggle.addEventListener('click', function() {
+                            document.body.classList.toggle('dark-theme');
+                            
+                            if (document.body.classList.contains('dark-theme')) {
+                                themeToggle.textContent = '☀️';
+                                localStorage.setItem('theme', 'dark');
+                            } else {
+                                themeToggle.textContent = '🌙';
+                                localStorage.setItem('theme', 'light');
+                            }
+                        });
+                    }
+                    
+                    // View stats
+                    if (viewStatsButton) {
+                        viewStatsButton.addEventListener('click', function() {
+                            const mainCard = document.querySelector('.tracker-card:not(.stats-view):not(.settings-view)');
+                            if (mainCard) mainCard.style.display = 'none';
+                            if (statsView) statsView.style.display = 'block';
+                            if (settingsView) settingsView.style.display = 'none';
+                            
+                            updateStats();
+                        });
+                    }
+                    
+                    // View settings
+                    if (viewSettingsButton) {
+                        viewSettingsButton.addEventListener('click', function() {
+                            const mainCard = document.querySelector('.tracker-card:not(.stats-view):not(.settings-view)');
+                            if (mainCard) mainCard.style.display = 'none';
+                            if (statsView) statsView.style.display = 'none';
+                            if (settingsView) settingsView.style.display = 'block';
+                        });
+                    }
+                    
+                    // Back buttons
+                    if (backToMainButton) {
+                        backToMainButton.addEventListener('click', function() {
+                            const mainCard = document.querySelector('.tracker-card:not(.stats-view):not(.settings-view)');
+                            if (mainCard) mainCard.style.display = 'block';
+                            if (statsView) statsView.style.display = 'none';
+                            if (settingsView) settingsView.style.display = 'none';
+                        });
+                    }
+                    
+                    if (backFromSettingsButton) {
+                        backFromSettingsButton.addEventListener('click', function() {
+                            const mainCard = document.querySelector('.tracker-card:not(.stats-view):not(.settings-view)');
+                            if (mainCard) mainCard.style.display = 'block';
+                            if (statsView) statsView.style.display = 'none';
+                            if (settingsView) settingsView.style.display = 'none';
+                        });
+                    }
+                    
+                    // Add custom container
+                    if (addCustomContainer && customContainerForm) {
+                        addCustomContainer.addEventListener('click', function() {
+                            customContainerForm.classList.toggle('active');
+                        });
+                    }
+                    
+                    // Save custom container
+                    if (saveContainer) {
+                        saveContainer.addEventListener('click', function() {
+                            const nameInput = document.getElementById('containerName');
+                            const iconSelect = document.getElementById('containerIcon');
+                            const mlInput = document.getElementById('containerMl');
+                            
+                            if (!nameInput || !iconSelect || !mlInput) {
+                                showError('Impossible d\'ajouter un contenant personnalisé. Éléments du formulaire manquants.');
+                                return;
+                            }
+                            
+                            const name = nameInput.value;
+                            const icon = iconSelect.value;
+                            const ml = parseInt(mlInput.value);
+                            
+                            if (name && ml > 0) {
+                                customContainers.push({
+                                    name: name,
+                                    icon: icon,
+                                    ml: ml
+                                });
+                                
+                                localStorage.setItem('customContainers', JSON.stringify(customContainers));
+                                
+                                // Reset form
+                                nameInput.value = '';
+                                mlInput.value = '';
+                                
+                                // Hide form
+                                customContainerForm.classList.remove('active');
+                                
+                                // Render new containers
+                                renderCustomContainers();
+                            } else {
+                                showError('Veuillez saisir un nom et un volume valide.');
+                            }
+                        });
+                    }
+                    
+                    // Save settings
+                    if (saveSettings) {
+                        saveSettings.addEventListener('click', function() {
+                            if (!dailyGoal || !reminderInterval || !reminderStart || !reminderEnd) {
+                                showError('Impossible de sauvegarder les paramètres. Éléments du formulaire manquants.');
+                                return;
+                            }
+                            
+                            goal = parseInt(dailyGoal.value) || 2000;
+                            if (goalAmountDisplay) goalAmountDisplay.textContent = goal + ' ml';
+                            
+                            reminders.interval = parseInt(reminderInterval.value) || 60;
+                            reminders.start = reminderStart.value;
+                            reminders.end = reminderEnd.value;
+                            
+                            saveData();
+                            updateUI();
+                            
+                            // Show confirmation
+                            alert('Paramètres enregistrés avec succès!');
+                            
+                            // Setup reminders
+                            setupReminders();
+                        });
+                    }
+                    
+                    // Stats period tabs
+                    statsTabs.forEach(tab => {
+                        tab.addEventListener('click', function() {
+                            statsTabs.forEach(t => t.classList.remove('active'));
+                            this.classList.add('active');
+                            
+                            currentStatsPeriod = this.getAttribute('data-period');
+                            updateStats();
+                        });
+                    });
+                } catch (error) {
+                    console.error('Erreur lors de la configuration des écouteurs d\'événements:', error);
+                    showError('Une erreur est survenue lors de l\'initialisation de l\'application.');
+                }
+            }
+            
+            // Setup notification reminders
+            function setupReminders() {
+                try {
+                    // Clear any existing reminders
+                    if (window.reminderInterval) {
+                        clearInterval(window.reminderInterval);
+                    }
+                    
+                    // Check if notifications are supported
+                    if (!("Notification" in window)) {
+                        console.log('Les notifications ne sont pas supportées par ce navigateur.');
+                        return;
+                    }
+                    
+                    // Request permission if needed
+                    if (Notification.permission !== "granted") {
+                        Notification.requestPermission();
+                    }
+                    
+                    // Set up interval
+                    window.reminderInterval = setInterval(() => {
+                        const now = new Date();
+                        const currentTime = now.getHours() * 60 + now.getMinutes();
+                        
+                        const [startHours, startMinutes] = reminders.start.split(':').map(n => parseInt(n));
+                        const [endHours, endMinutes] = reminders.end.split(':').map(n => parseInt(n));
+                        
+                        const startTime = startHours * 60 + startMinutes;
+                        const endTime = endHours * 60 + endMinutes;
+                        
+                        if (currentTime >= startTime && currentTime <= endTime) {
+                            // Calculate percentage of goal
+                            const percentage = (totalAmount / goal) * 100;
+                            
+                            // Only send reminder if under 80% of goal
+                            if (percentage < 80) {
+                                sendNotification();
+                            }
+                        }
+                    }, reminders.interval * 60 * 1000); // Convert minutes to milliseconds
+                } catch (error) {
+                    console.error('Erreur lors de la configuration des rappels:', error);
+                }
+            }
+            
+            // Send notification reminder
+            function sendNotification() {
+                try {
+                    if (Notification.permission === "granted") {
+                        const randomIndex = Math.floor(Math.random() * mantras.length);
+                        const notification = new Notification("Rappel d'hydratation", {
+                            icon: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cGF0aCBmaWxsPSIjNDFiNmU2IiBkPSJNNTAgMTBjLTguMyAxNS0yNSA0My0yNSA2MC40QzI1IDg2IDM2IDk1IDUwIDk1czI1LTkgMjUtMjQuNkM3NSA1MyA1OC4zIDI1IDUwIDEweiIvPjxwYXRoIGZpbGw9IiMyMTk2RjMiIGQ9Ik01MCAxMGMtNSA5LTEyLjUgMjItMTcuNyAzNC42QzM3LjYgNjggNDMuMyA4MSA1MCA4MWM2LjYgMCAxMi4zLTEzIDE3LjctMzYuNEM2Mi41IDMyIDU1IDIwIDUwIDEweiIvPjwvc3ZnPg==",
+                            body: `N'oubliez pas de boire de l'eau! ${mantras[randomIndex]}`
+                        });
+                        
+                        notification.onclick = function() {
+                            window.focus();
+                            this.close();
+                        };
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de l\'envoi de la notification:', error);
+                }
+            }
+            
+            // Add chart.js library if not already loaded
+            function loadChartJsScript() {
+                return new Promise((resolve, reject) => {
+                    // Vérifier si Chart.js est déjà chargé
+                    if (typeof Chart !== 'undefined') {
+                        console.log('Chart.js est déjà chargé');
+                        resolve();
+                        return;
+                    }
+                    
+                    console.log('Chargement de Chart.js...');
+                    
+                    // Créer l'élément script
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+                    script.async = true;
+                    
+                    // Gérer le chargement réussi
+                    script.onload = function() {
+                        console.log('Chart.js chargé avec succès');
+                        resolve();
+                    };
+                    
+                    // Gérer les erreurs de chargement
+                    script.onerror = function() {
+                        console.error('Erreur lors du chargement de Chart.js');
+                        reject(new Error('Impossible de charger Chart.js'));
+                        
+                        // Afficher un message d'erreur dans l'application
+                        showError('Impossible de charger les graphiques. Vérifiez votre connexion internet.');
+                    };
+                    
+                    // Ajouter le script au document
+                    document.head.appendChild(script);
+                });
+            }
+            
+            // Initialize app
+            async function initApp() {
+                try {
+                    // Charger les données
+                    loadData();
+                    
+                    // Mettre à jour l'interface
+                    updateUI();
+                    
+                    // Rendre les contenants personnalisés
+                    renderCustomContainers();
+                    
+                    // Configurer les écouteurs d'événements
+                    setupEventListeners();
+                    
+                    // Configurer les rappels
+                    setupReminders();
+                    
+                    // Afficher un mantra aléatoire
+                    showRandomMantra();
+                    
+                    // Changer le mantra toutes les minutes
+                    setInterval(showRandomMantra, 60000);
+                    
+                    // Essayer de charger Chart.js si nécessaire
+                    if (typeof Chart === 'undefined') {
+                        try {
+                            await loadChartJsScript();
+                            console.log('Chart.js est maintenant disponible');
+                            
+                            // Si la vue des statistiques est active, mettre à jour les statistiques
+                            if (statsView && statsView.style.display === 'block') {
+                                updateStats();
+                            }
+                        } catch (error) {
+                            console.error('Échec du chargement de Chart.js:', error);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de l\'initialisation de l\'application:', error);
+                    showError('Une erreur est survenue lors de l\'initialisation de l\'application. Veuillez rafraîchir la page.');
+                }
+            }
+            
+            // Initialize app when DOM is loaded
+            initApp();
+        });
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suivi d'Hydratation Quotidienne</title>
+    <!-- Préchargement de Chart.js pour assurer qu'il est disponible -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cGF0aCBmaWxsPSIjNDFiNmU2IiBkPSJNNTAgMTBjLTguMyAxNS0yNSA0My0yNSA2MC40QzI1IDg2IDM2IDk1IDUwIDk1czI1LTkgMjUtMjQuNkM3NSA1MyA1OC4zIDI1IDUwIDEweiIvPjxwYXRoIGZpbGw9IiMyMTk2RjMiIGQ9Ik01MCAxMGMtNSA5LTEyLjUgMjItMTcuNyAzNC42QzM3LjYgNjggNDMuMyA4MSA1MCA4MWM2LjYgMCAxMi4zLTEzIDE3LjctMzYuNEM2Mi41IDMyIDU1IDIwIDUwIDEweiIvPjwvc3ZnPg==">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <style>
+        :root {
+            --primary-color: #41b6e6;
+            --secondary-color: #2196F3;
+            --tertiary-color: #4CAF50;
+            --background-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --accent-color: #00796B;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            text-align: center;
+            padding: 2rem 1rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 2rem;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+            flex: 1;
+        }
+        
+        .intro {
+            text-align: center;
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .intro h2 {
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+        
+        .tracker-card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            transition: transform 0.3s ease;
+        }
+        
+        .tracker-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .section-title {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 0.5rem;
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .water-container {
+            background-color: rgba(33, 150, 243, 0.1);
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+        }
+        
+        .container-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+            padding: 1rem;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            width: 120px;
+        }
+        
+        .container-item:hover {
+            transform: scale(1.05);
+        }
+        
+        .container-item.active {
+            background-color: rgba(76, 175, 80, 0.2);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        
+        .container-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+        
+        .container-name {
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .container-ml {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .water-log {
+            height: 300px;
+            overflow-y: auto;
+            background-color: rgba(33, 150, 243, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .log-entry {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.8rem;
+            border-bottom: 1px solid #e0e0e0;
+            background-color: white;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .log-time {
+            font-weight: bold;
+        }
+        
+        .log-container {
+            flex: 1;
+            text-align: center;
+            color: var(--secondary-color);
+        }
+        
+        .log-amount {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+        
+        .log-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .log-delete {
+            cursor: pointer;
+            color: #F44336;
+            padding: 0 0.5rem;
+            transition: transform 0.2s;
+        }
+        
+        .log-delete:hover {
+            transform: scale(1.2);
+        }
+        
+        .daily-summary {
+            background-color: rgba(0, 121, 107, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        
+        .total-amount {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--accent-color);
+            margin: 1rem 0;
+        }
+        
+        .goal-progress {
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            margin-top: 1rem;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary-color), var(--tertiary-color));
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        
+        .mantra-card {
+            background-color: rgba(76, 175, 80, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            border-left: 4px solid var(--tertiary-color);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .mantra-text {
+            font-style: italic;
+            font-size: 1.2rem;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .mantra-card::before {
+            content: '"';
+            font-size: 8rem;
+            position: absolute;
+            top: -20px;
+            left: 10px;
+            color: rgba(76, 175, 80, 0.1);
+            z-index: 1;
+        }
+        
+        .toggle-theme {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            z-index: 1000;
+            transition: transform 0.3s;
+        }
+        
+        .toggle-theme:hover {
+            transform: rotate(30deg);
+        }
+        
+        .dark-theme {
+            --primary-color: #64B5F6;
+            --secondary-color: #42A5F5;
+            --tertiary-color: #66BB6A;
+            --background-color: #121212;
+            --card-bg: #1E1E1E;
+            --text-color: #E0E0E0;
+        }
+        
+        .settings-card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .setting-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .setting-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        
+        .setting-input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        
+        .save-settings {
+            background-color: var(--tertiary-color);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 1rem;
+            transition: background-color 0.3s;
+        }
+        
+        .save-settings:hover {
+            background-color: #388E3C;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            justify-content: center;
+        }
+        
+        .action-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .action-button:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .stats-button {
+            background-color: var(--tertiary-color);
+        }
+        
+        .settings-button {
+            background-color: var(--accent-color);
+        }
+        
+        .water-level {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(to bottom, var(--primary-color), var(--secondary-color));
+            margin: 1rem auto;
+            position: relative;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .water-wave {
+            width: 200%;
+            height: 200%;
+            position: absolute;
+            bottom: 0;
+            left: -50%;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 40%;
+            animation: wave 8s infinite linear;
+        }
+        
+        @keyframes wave {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .water-percentage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            z-index: 2;
+        }
+        
+        .stats-view {
+            display: none;
+        }
+        
+        .settings-view {
+            display: none;
+        }
+        
+        .chart-container {
+            height: 300px;
+            margin: 1.5rem 0;
+            background-color: white;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .stats-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stats-tab {
+            padding: 0.5rem 1rem;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .stats-tab.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .calendar-view {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0.5rem;
+        }
+        
+        .calendar-cell {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        
+        .calendar-date {
+            font-weight: bold;
+        }
+        
+        .calendar-value {
+            color: var(--accent-color);
+        }
+        
+        /* Mobile Responsive Styles */
+        @media screen and (max-width: 768px) {
+            .water-container {
+                gap: 0.5rem;
+            }
+            
+            .container-item {
+                width: calc(50% - 0.5rem);
+                padding: 0.8rem;
+            }
+            
+            .container-icon {
+                font-size: 2rem;
+            }
+            
+            .action-buttons {
+                flex-wrap: wrap;
+            }
+            
+            .action-button {
+                flex: 1;
+                padding: 0.8rem 1rem;
+                font-size: 0.9rem;
+                text-align: center;
+            }
+            
+            .settings-card, .tracker-card {
+                padding: 1rem;
+            }
+            
+            .water-level {
+                width: 80px;
+                height: 80px;
+            }
+        }
+        
+        /* Add container buttons */
+        .add-container {
+            margin-top: 1rem;
+            text-align: center;
+        }
+        
+        .custom-container-form {
+            display: none;
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .custom-container-form.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-submit {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        /* Summary Card */
+        .summary-card {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .summary-item {
+            flex: 1;
+            min-width: 150px;
+            background-color: var(--card-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 0.5rem 0;
+        }
+        
+        .summary-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* Logo animation */
+        .logo {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 1rem;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        /* Add button animation */
+        .add-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .add-button:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 2rem;
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        /* Ajout d'une animation de chargement */
+        .loading {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Message d'erreur */
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+            text-align: center;
+            border-left: 4px solid #c62828;
+        }
+    </style>
+</head>
+<body>
+    <button class="toggle-theme" id="themeToggle">🌙</button>
+    
+    <header>
+        <svg class="logo" viewBox="0 0 100 100">
+            <path fill="#41b6e6" d="M50 10c-8.3 15-25 43-25 60.4C25 86 36 95 50 95s25-9 25-24.6C75 53 58.3 25 50 10z"/>
+            <path fill="#2196F3" d="M50 10c-5 9-12.5 22-17.7 34.6C37.6 68 43.3 81 50 81c6.6 0 12.3-13 17.7-36.4C62.5 32 55 20 50 10z"/>
+        </svg>
+        <h1>Suivi d'Hydratation Quotidienne</h1>
+        <p>Buvez plus, vivez mieux</p>
+    </header>
+    
+    <div class="container">
+        <div class="intro">
+            <h2>Bienvenue dans votre suivi d'hydratation!</h2>
+            <p>Suivez facilement votre consommation d'eau quotidienne, définissez des objectifs et gardez une trace de vos progrès. Une bonne hydratation est essentielle pour votre santé et votre bien-être.</p>
+        </div>
+        
+        <div class="mantra-card">
+            <p class="mantra-text" id="mantraText">Je bénis cette eau qui nourrit chaque cellule de mon corps, me purifie et me donne énergie et vitalité.</p>
+        </div>
+        
+        <div class="tracker-card">
+            <h3 class="section-title">Résumé quotidien</h3>
+            
+            <div class="daily-summary">
+                <div class="water-level">
+                    <div class="water-wave"></div>
+                    <div class="water-percentage" id="waterPercentage">0%</div>
+                </div>
+                <p>Vous avez bu aujourd'hui:</p>
+                <div class="total-amount" id="totalAmount">0 ml</div>
+                <p>Objectif: <span id="goalAmount">2000 ml</span></p>
+                <div class="goal-progress">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+            
+            <h3 class="section-title">Ajouter de l'eau</h3>
+            
+            <div class="water-container" id="waterContainers">
+                <div class="container-item" data-ml="250">
+                    <div class="container-icon">🥤</div>
+                    <div class="container-name">Petit verre</div>
+                    <div class="container-ml">250 ml</div>
+                </div>
+                
+                <div class="container-item" data-ml="330">
+                    <div class="container-icon">🧃</div>
+                    <div class="container-name">Canette</div>
+                    <div class="container-ml">330 ml</div>
+                </div>
+                
+                <div class="container-item" data-ml="500">
+                    <div class="container-icon">🍶</div>
+                    <div class="container-name">Bouteille</div>
+                    <div class="container-ml">500 ml</div>
+                </div>
+                
+                <div class="container-item" data-ml="750">
+                    <div class="container-icon">🫙</div>
+                    <div class="container-name">Grande bouteille</div>
+                    <div class="container-ml">750 ml</div>
+                </div>
+                
+                <div class="container-item" data-ml="1000">
+                    <div class="container-icon">🍯</div>
+                    <div class="container-name">Pichet</div>
+                    <div class="container-ml">1000 ml</div>
+                </div>
+                
+                <div class="container-item" data-ml="200">
+                    <div class="container-icon">☕</div>
+                    <div class="container-name">Tasse</div>
+                    <div class="container-ml">200 ml</div>
+                </div>
+            </div>
+            
+            <div class="add-container">
+                <button class="add-button" id="addCustomContainer">+ Ajouter un contenant personnalisé</button>
+                
+                <div class="custom-container-form" id="customContainerForm">
+                    <div class="form-group">
+                        <label for="containerName">Nom du contenant</label>
+                        <input type="text" id="containerName" class="setting-input" placeholder="Ex: Ma gourde">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="containerIcon">Icône</label>
+                        <select id="containerIcon" class="setting-input">
+                            <option value="🫙">🫙 Gourde</option>
+                            <option value="🍶">🍶 Bouteille</option>
+                            <option value="🥤">🥤 Verre</option>
+                            <option value="☕">☕ Tasse</option>
+                            <option value="🧃">🧃 Brique</option>
+                            <option value="🧊">🧊 Glace</option>
+                            <option value="🍵">🍵 Thé</option>
+                            <option value="🥛">🥛 Lait</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="containerMl">Volume (ml)</label>
+                        <input type="number" id="containerMl" class="setting-input" placeholder="Ex: 600">
+                    </div>
+                    
+                    <button class="form-submit" id="saveContainer">Ajouter</button>
+                </div>
+            </div>
+            
+            <h3 class="section-title">Journal d'hydratation</h3>
+            
+            <div class="water-log" id="waterLog">
+                <!-- Les entrées du journal seront générées par JavaScript -->
+            </div>
+            
+            <div class="action-buttons">
+                <button class="action-button" id="viewStatsButton">Statistiques</button>
+                <button class="action-button settings-button" id="viewSettingsButton">Paramètres</button>
+            </div>
+        </div>
+        
+        <div class="tracker-card stats-view" id="statsView">
+            <h3 class="section-title">Statistiques d'hydratation</h3>
+            
+            <div class="summary-card">
+                <div class="summary-item">
+                    <div class="summary-label">Moyenne quotidienne</div>
+                    <div class="summary-value" id="averageDaily">0 ml</div>
+                </div>
+                
+                <div class="summary-item">
+                    <div class="summary-label">Meilleur jour</div>
+                    <div class="summary-value" id="bestDay">0 ml</div>
+                </div>
+                
+                <div class="summary-item">
+                    <div class="summary-label">Total semaine</div>
+                    <div class="summary-value" id="weeklyTotal">0 ml</div>
+                </div>
+            </div>
+            
+            <div class="stats-tabs">
+                <div class="stats-tab active" data-period="week">Cette semaine</div>
+                <div class="stats-tab" data-period="month">Ce mois</div>
+            </div>
+            
+            <div class="chart-container" id="statsChart">
+                <!-- Le graphique sera généré par JavaScript -->
+                <canvas id="hydrationChart"></canvas>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="action-button" id="backToMainButton">Retour</button>
+            </div>
+        </div>
+        
+        <div class="settings-card settings-view" id="settingsView">
+            <h3 class="section-title">Paramètres</h3>
+            
+            <div class="setting-group">
+                <label class="setting-label" for="dailyGoal">Objectif quotidien (ml)</label>
+                <input type="number" id="dailyGoal" class="setting-input" value="2000">
+            </div>
+            
+            <div class="setting-group">
+                <label class="setting-label" for="reminderInterval">Intervalle de rappel (minutes)</label>
+                <input type="number" id="reminderInterval" class="setting-input" value="60">
+            </div>
+            
+            <div class="setting-group">
+                <label class="setting-label" for="reminderStart">Heure de début des rappels</label>
+                <input type="time" id="reminderStart" class="setting-input" value="08:00">
+            </div>
+            
+            <div class="setting-group">
+                <label class="setting-label" for="reminderEnd">Heure de fin des rappels</label>
+                <input type="time" id="reminderEnd" class="setting-input" value="20:00">
+            </div>
+            
+            <button class="save-settings" id="saveSettings">Enregistrer les paramètres</button>
+            
+            <div class="action-buttons">
+                <button class="action-button" id="backFromSettingsButton">Retour</button>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>© 2025 Suivi d'Hydratation Quotidienne</p>
+        <p>Buvez régulièrement. Votre corps vous remerciera!</p>
